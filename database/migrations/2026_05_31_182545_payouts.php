@@ -14,25 +14,25 @@ return new class extends Migration
         Schema::create('payouts', function (Blueprint $table) {
 
             $table->id();
-        
+
             $table->foreignId('payment_id')
-                ->constrained()
+                ->constrained('payments')
                 ->onDelete('cascade');
-        
+
             $table->foreignId('donor_id')
                 ->constrained('users')
                 ->onDelete('cascade');
-        
+
             $table->decimal('amount', 12, 2);
-        
+
             $table->enum('status', [
                 'pending',
                 'sent',
-                'completed'
+                'completed',
             ])->default('pending');
-        
+
             $table->timestamp('sent_at')->nullable();
-        
+
             $table->timestamps();
         });
     }

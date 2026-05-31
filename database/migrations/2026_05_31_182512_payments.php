@@ -14,40 +14,40 @@ return new class extends Migration
         Schema::create('payments', function (Blueprint $table) {
 
             $table->id();
-        
+
             $table->foreignId('claim_id')
                 ->constrained('food_claims')
                 ->onDelete('cascade');
-        
+
             $table->foreignId('user_id')
-                ->constrained()
+                ->constrained('users')
                 ->onDelete('cascade');
-        
+
             $table->decimal('amount', 12, 2);
-        
+
             $table->decimal('service_fee', 12, 2);
-        
+
             $table->decimal('donor_amount', 12, 2);
-        
+
             $table->enum('payment_method', [
                 'qris',
                 'bank_transfer',
-                'ewallet'
+                'ewallet',
             ]);
-        
+
             $table->enum('payment_status', [
                 'pending',
                 'paid',
                 'failed',
                 'expired',
-                'refunded'
+                'refunded',
             ])->default('pending');
-        
+
             $table->string('transaction_reference')
                 ->nullable();
-        
+
             $table->timestamp('paid_at')->nullable();
-        
+
             $table->timestamps();
         });
     }

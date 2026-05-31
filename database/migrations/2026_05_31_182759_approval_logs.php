@@ -14,28 +14,28 @@ return new class extends Migration
         Schema::create('approval_logs', function (Blueprint $table) {
 
             $table->id();
-        
+
             $table->foreignId('admin_id')
                 ->constrained('users')
                 ->onDelete('cascade');
-        
+
             $table->foreignId('food_id')
                 ->nullable()
-                ->constrained()
+                ->constrained('foods')
                 ->nullOnDelete();
-        
+
             $table->foreignId('donor_profile_id')
                 ->nullable()
-                ->constrained()
+                ->constrained('donor_profiles')
                 ->nullOnDelete();
-        
+
             $table->enum('status', [
                 'approved',
-                'rejected'
+                'rejected',
             ]);
-        
+
             $table->text('notes')->nullable();
-        
+
             $table->timestamps();
         });
     }

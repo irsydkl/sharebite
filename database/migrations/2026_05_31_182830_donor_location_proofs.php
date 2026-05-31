@@ -14,15 +14,15 @@ return new class extends Migration
         Schema::create('donor_location_proofs', function (Blueprint $table) {
 
             $table->id();
-        
+
             $table->foreignId('donor_profile_id')
-                ->constrained()
+                ->constrained('donor_profiles')
                 ->onDelete('cascade');
-        
+
             $table->string('image');
-        
+
             $table->text('notes')->nullable();
-        
+
             $table->timestamps();
         });
     }

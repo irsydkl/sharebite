@@ -13,7 +13,7 @@ return new class extends Migration
             $table->enum('role', [
                 'admin',
                 'donatur',
-                'user'
+                'user',
             ])->default('user');
 
             $table->string('phone')->nullable();
@@ -63,7 +63,7 @@ return new class extends Migration
                 'is_verified',
                 'verified_at',
                 'last_login_at',
-                'last_login_ip'
+                'last_login_ip',
             ]);
         });
     }
