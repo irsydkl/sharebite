@@ -89,4 +89,28 @@ class User extends Authenticatable
     {
         return $this->hasMany(Notification::class);
     }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    public function isDonatur(): bool
+    {
+        return $this->role === 'donatur';
+    }
+
+    public function isUser(): bool
+    {
+        return $this->role === 'user';
+    }
+
+    public function dashboardRouteName(): string
+    {
+        return match ($this->role) {
+            'admin' => 'admin.dashboard',
+            'donatur' => 'donatur.dashboard',
+            default => 'user.dashboard',
+        };
+    }
 }
