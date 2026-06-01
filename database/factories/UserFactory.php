@@ -12,14 +12,9 @@ use Illuminate\Support\Str;
  */
 class UserFactory extends Factory
 {
-    /**
-     * The current password being used by the factory.
-     */
     protected static ?string $password;
 
     /**
-     * Define the model's default state.
-     *
      * @return array<string, mixed>
      */
     public function definition(): array
@@ -30,16 +25,50 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            'role' => 'user',
+            'phone' => fake()->numerify('08##########'),
+            'address' => fake()->address(),
+            'latitude' => fake()->latitude(-6.4, -6.0),
+            'longitude' => fake()->longitude(106.6, 107.0),
+            'balance' => fake()->randomFloat(2, 0, 500000),
+            'is_active' => true,
+            'profile_photo' => null,
+            'is_verified' => false,
+            'verified_at' => null,
+            'last_login_at' => null,
+            'last_login_ip' => null,
         ];
     }
 
-    /**
-     * Indicate that the model's email address should be unverified.
-     */
     public function unverified(): static
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    public function admin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'admin',
+            'is_verified' => true,
+            'verified_at' => now(),
+        ]);
+    }
+
+    public function donatur(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'donatur',
+            'is_verified' => true,
+            'verified_at' => now(),
+        ]);
+    }
+
+    public function user(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'user',
         ]);
     }
 }

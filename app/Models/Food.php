@@ -9,6 +9,8 @@ class Food extends Model
 {
     use HasFactory;
 
+    protected $table = 'foods';
+
     protected $fillable = ['donor_id', 'category_id', 'approved_by', 'title', 'description', 'quantity', 'remaining_quantity', 'unit', 'original_price', 'service_fee', 'final_price', 'pickup_address', 'latitude', 'longitude', 'pickup_start', 'pickup_end', 'pickup_deadline', 'pickup_duration_minutes', 'approval_status', 'status', 'expired_at'];
 
     protected $casts = ['pickup_start' => 'datetime', 'pickup_end' => 'datetime', 'pickup_deadline' => 'datetime', 'expired_at' => 'datetime'];
