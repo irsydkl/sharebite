@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\DonorProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -77,6 +78,52 @@ class ProfileTest extends TestCase
 
         $this->assertGuest();
         $this->assertNull($user->fresh());
+    }
+
+    public function test_donatur_can_update_store_profile(): void
+    {
+        $donatur = User::factory()->donatur()->create();
+        $profile = DonorProfile::factory()->approved()->create([
+            'user_id' => $donatur->id,
+            'store_name' => 'Toko Lama',
+            'store_address' => 'Alamat Lama',
+            'latitude' => -6.2,
+            'longitude' => 106.8,
+        ]);
+
+        $response = $this
+            ->actingAs($donatur)
+            ->patch(route('profile.store.update'), [
+                'store_name' => 'Toko Baru',
+                'store_description' => 'Deskripsi baru',
+                'store_address' => 'Alamat Baru, Jakarta',
+                'store_latitude' => -6.175,
+                'store_longitude' => 106.82,
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('profile.edit'))
+            ->assertSessionHas('status', 'store-updated-pending');
+
+        $profile->refresh();
+
+        $this->assertSame('Toko Baru', $profile->store_name);
+        $this->assertSame('pending', $profile->approval_status);
+    }
+
+    public function test_non_donatur_cannot_update_store_profile(): void
+    {
+        $user = User::factory()->user()->create();
+
+        $this->actingAs($user)
+            ->patch(route('profile.store.update'), [
+                'store_name' => 'Toko',
+                'store_address' => 'Alamat',
+                'store_latitude' => -6.2,
+                'store_longitude' => 106.8,
+            ])
+            ->assertForbidden();
     }
 
     public function test_correct_password_must_be_provided_to_delete_account(): void

@@ -4,13 +4,15 @@
     'label' => 'Lokasi di Peta',
     'required' => false,
     'height' => '280px',
+    'initialLat' => null,
+    'initialLng' => null,
 ])
 
 @php
     $latId = $latName;
     $lngId = $lngName;
-    $initialLat = old($latName);
-    $initialLng = old($lngName);
+    $initialLat = old($latName, $initialLat);
+    $initialLng = old($lngName, $initialLng);
 @endphp
 
 <div {{ $attributes->merge(['class' => 'map-picker']) }}

@@ -17,6 +17,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => EnsureUserHasRole::class,
         ]);
 
+        // Exclude Midtrans webhook from CSRF verification
+        $middleware->validateCsrfTokens(except: [
+            'webhook/midtrans',
+        ]);
+
         $middleware->redirectUsersTo(function (Request $request) {
             return route($request->user()->dashboardRouteName());
         });
