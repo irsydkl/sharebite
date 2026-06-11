@@ -32,10 +32,14 @@ class PaymentService
     {
         $claim->load(['food', 'user']);
 
+        $foodPrice = (int) round($claim->subtotal_price);
+        $serviceFeePrice = (int) round($claim->service_fee);
+        $grossAmount = $foodPrice + $serviceFeePrice;
+
         $params = [
             'transaction_details' => [
-                'order_id' => $claim->booking_code,
-                'gross_amount' => (int) $claim->total_price,
+                'order_id' => $claim->booking_code . '-' . time(),
+                'gross_amount' => $grossAmount,
             ],
             'customer_details' => [
                 'first_name' => $claim->user->name,
@@ -45,13 +49,13 @@ class PaymentService
             'item_details' => [
                 [
                     'id'       => 'food-'.$claim->food_id,
-                    'price'    => (int) round($claim->subtotal_price / $claim->quantity_claimed),
-                    'quantity' => $claim->quantity_claimed,
-                    'name'     => substr($claim->food->title, 0, 50),
+                    'price'    => $foodPrice,
+                    'quantity' => 1,
+                    'name'     => substr($claim->food->title, 0, 40) . ' (' . $claim->quantity_claimed . ' ' . $claim->food->unit . ')',
                 ],
                 [
                     'id'       => 'service-fee',
-                    'price'    => (int) $claim->service_fee,
+                    'price'    => $serviceFeePrice,
                     'quantity' => 1,
                     'name'     => 'Biaya Layanan',
                 ],
@@ -60,6 +64,15 @@ class PaymentService
                 'start_time' => now()->format('Y-m-d H:i:s O'),
                 'unit'       => 'minutes',
                 'duration'   => 5,
+            ],
+            'enabled_payments' => [
+                'qris',
+                'dana',
+                'ovo',
+                'linkaja',
+                'gopay',
+                'shopeepay',
+                'bank_transfer',
             ],
         ];
 
@@ -88,7 +101,8 @@ class PaymentService
         }
 
         DB::transaction(function () use ($orderId, $status, $payload) {
-            $claim = FoodClaim::where('booking_code', $orderId)
+            $bookingCode = explode('-', $orderId)[0];
+            $claim = FoodClaim::where('booking_code', $bookingCode)
                 ->lockForUpdate()
                 ->first();
 
