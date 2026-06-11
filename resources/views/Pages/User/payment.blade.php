@@ -90,6 +90,23 @@
             </p>
 
             @if($snapToken)
+                @if(str_starts_with($snapToken, 'mock-snap-token-'))
+                    <div class="mb-6 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl p-5 backdrop-blur-sm transition-all duration-300 hover:shadow-md">
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-600">
+                                <i class="fa-solid fa-wand-magic-sparkles text-lg animate-pulse"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h4 class="text-sm font-bold text-amber-900 mb-1">Mode Simulasi Pembayaran Aktif</h4>
+                                <p class="text-xs text-amber-800 leading-relaxed">
+                                    API Midtrans mengembalikan error (401 Unauthorized) atau kredensial belum dikonfigurasi di file <code>.env</code>.
+                                    Tombol di bawah akan menyimulasikan alur pembayaran sukses secara otomatis untuk keperluan pengujian.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
                 {{-- Main Pay Button --}}
                 <button id="pay-button"
                     data-snap-token="{{ $snapToken }}"
@@ -147,6 +164,46 @@
 
     // ── Midtrans Snap ──────────────────────────────────────────────
     payBtn.addEventListener('click', function () {
+        if (snapToken.startsWith('mock-snap-token-')) {
+            // Mock simulation mode
+            payBtn.disabled = true;
+            payBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Memproses Simulasi...';
+
+            fetch('/webhook/midtrans', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                },
+                body: JSON.stringify({
+                    order_id: '{{ $claim->booking_code }}',
+                    transaction_status: 'settlement',
+                    status_code: '200',
+                    gross_amount: '{{ $claim->total_price }}',
+                    payment_type: 'mock_payment',
+                    transaction_id: 'mock-trans-id-' + Math.floor(Math.random() * 1000000),
+                    is_mock_simulation: true
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Simulation webhook failed');
+                }
+                return response.json();
+            })
+            .then(data => {
+                window.location.href = returnUrl;
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Gagal menyimulasikan pembayaran.');
+                payBtn.disabled = false;
+                payBtn.innerHTML = '<i class="fa-solid fa-credit-card text-lg"></i>Bayar Sekarang — Rp {{ number_format($claim->total_price, 0, ',', '.') }}';
+            });
+            return;
+        }
+
         snap.pay(snapToken, {
             onSuccess: function (result) {
                 window.location.href = returnUrl;
@@ -165,4 +222,5 @@
     });
 </script>
 @endif
+
 @endsection

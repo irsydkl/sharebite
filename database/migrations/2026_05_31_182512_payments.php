@@ -29,11 +29,7 @@ return new class extends Migration
 
             $table->decimal('donor_amount', 12, 2);
 
-            $table->enum('payment_method', [
-                'qris',
-                'bank_transfer',
-                'ewallet',
-            ]);
+            $table->string('payment_method');
 
             $table->enum('payment_status', [
                 'pending',
