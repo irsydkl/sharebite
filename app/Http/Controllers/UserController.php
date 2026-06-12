@@ -104,13 +104,35 @@ class UserController extends Controller
         $claim = FoodClaim::where('user_id', Auth::id())->findOrFail($id);
 
         return match ($claim->claim_status) {
-            'ready_pickup' => redirect()->route('riwayat.index')
-                ->with('success', 'Pembayaran berhasil dikonfirmasi. Silakan ambil makanan Anda.'),
-            'cancelled' => redirect()->route('user.dashboard')
-                ->with('error', 'Pembayaran dibatalkan. Klaim telah dibatalkan dan stok dikembalikan.'),
-            default => redirect()->route('user.claims.payment', $id)
+            'ready_pickup' => redirect()->route('user.claims.payment.success', $id),
+            'cancelled' => redirect()->route('user.claims.payment.failed', $id),
+            default => redirect()->route('user.claims.payment.success', $id)
                 ->with('info', 'Pembayaran sedang diproses. Silakan tunggu konfirmasi.'),
         };
+    }
+
+    // ------------------------------------------------------------------ //
+    // Payment Success Page
+    // ------------------------------------------------------------------ //
+    public function paymentSuccess($id)
+    {
+        $claim = FoodClaim::with(['food.donor.donorProfile', 'payment'])
+            ->where('user_id', Auth::id())
+            ->findOrFail($id);
+
+        return view('Pages.User.payment-success', compact('claim'));
+    }
+
+    // ------------------------------------------------------------------ //
+    // Payment Failed Page
+    // ------------------------------------------------------------------ //
+    public function paymentFailed($id)
+    {
+        $claim = FoodClaim::with(['food.donor.donorProfile', 'payment'])
+            ->where('user_id', Auth::id())
+            ->findOrFail($id);
+
+        return view('Pages.User.payment-failed', compact('claim'));
     }
 
     // ------------------------------------------------------------------ //

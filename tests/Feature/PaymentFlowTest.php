@@ -96,18 +96,18 @@ class PaymentFlowTest extends TestCase
         $food = Food::factory()->create([
             'donor_id' => $donatur->id,
             'approval_status' => 'approved',
+            'quantity' => 1,
+            'final_price' => 50000,
         ]);
 
         $claim = FoodClaim::factory()->create([
             'food_id' => $food->id,
             'user_id' => $user->id,
             'claim_status' => 'ready_pickup',
-            'subtotal_price' => 50000,
+            'quantity_claimed' => 1,
         ]);
 
-        Payment::factory()->forClaim($claim)->paid()->create([
-            'donor_amount' => 50000,
-        ]);
+        Payment::factory()->forClaim($claim)->paid()->create();
 
         app(PaymentService::class)->completePickup($claim);
 
@@ -173,5 +173,30 @@ class PaymentFlowTest extends TestCase
         ])->assertOk();
 
         $this->assertSame('ready_pickup', $claim->fresh()->claim_status);
+    }
+
+    public function test_create_snap_token_handles_empty_phone(): void
+    {
+        $user = User::factory()->user()->create(['phone' => null]);
+        $donatur = User::factory()->donatur()->create();
+        DonorProfile::factory()->approved()->create(['user_id' => $donatur->id]);
+
+        $food = Food::factory()->create([
+            'donor_id' => $donatur->id,
+            'approval_status' => 'approved',
+        ]);
+
+        $claim = FoodClaim::factory()->create([
+            'food_id' => $food->id,
+            'user_id' => $user->id,
+            'claim_status' => 'waiting_payment',
+        ]);
+
+        Payment::factory()->forClaim($claim)->create();
+
+        $service = app(PaymentService::class);
+        $token = $service->createSnapToken($claim);
+
+        $this->assertNotNull($token);
     }
 }

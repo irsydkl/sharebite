@@ -40,16 +40,26 @@ class PaymentService
 
         $orderId = $claim->booking_code.'-'.time();
 
+        $nameParts = explode(' ', trim($claim->user->name), 2);
+        $firstName = $nameParts[0];
+        $lastName = $nameParts[1] ?? '';
+
+        $customerDetails = [
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'email' => $claim->user->email,
+        ];
+
+        if (! empty($claim->user->phone)) {
+            $customerDetails['phone'] = $claim->user->phone;
+        }
+
         $params = [
             'transaction_details' => [
                 'order_id' => $orderId,
                 'gross_amount' => $grossAmount,
             ],
-            'customer_details' => [
-                'first_name' => $claim->user->name,
-                'email' => $claim->user->email,
-                'phone' => $claim->user->phone ?? '',
-            ],
+            'customer_details' => $customerDetails,
             'item_details' => [
                 [
                     'id' => 'food-'.$claim->food_id,
@@ -63,11 +73,6 @@ class PaymentService
                     'quantity' => 1,
                     'name' => 'Biaya Layanan',
                 ],
-            ],
-            'expiry' => [
-                'start_time' => now()->format('Y-m-d H:i:s O'),
-                'unit' => 'minutes',
-                'duration' => 5,
             ],
             'enabled_payments' => [
                 'qris',
@@ -225,14 +230,15 @@ class PaymentService
             $claim->picked_up_at = now();
             $claim->save();
 
+            // Update donor's balance before handling payout creation
             $donor = User::lockForUpdate()->findOrFail($claim->food->donor_id);
+            $donor->balance = (float) $donor->balance + (float) $payment->donor_amount;
+            $donor->save();
 
             $payout = Payout::where('payment_id', $payment->id)->lockForUpdate()->first();
 
+            // Create payout if it does not exist
             if (! $payout) {
-                $donor->balance = (float) $donor->balance + (float) $payment->donor_amount;
-                $donor->save();
-
                 Payout::create([
                     'payment_id' => $payment->id,
                     'donor_id' => $claim->food->donor_id,

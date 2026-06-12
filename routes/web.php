@@ -55,6 +55,8 @@ Route::middleware(['auth', 'verified', 'role:user'])->prefix('user')->group(func
     Route::post('/food/{id}/claim', [UserController::class, 'claimFood'])->name('user.food.claim');
     Route::get('/claims/{id}/payment', [UserController::class, 'showPayment'])->name('user.claims.payment');
     Route::get('/claims/{id}/payment/return', [UserController::class, 'paymentReturn'])->name('user.claims.payment.return');
+    Route::get('/claims/{id}/payment/success', [UserController::class, 'paymentSuccess'])->name('user.claims.payment.success');
+    Route::get('/claims/{id}/payment/failed', [UserController::class, 'paymentFailed'])->name('user.claims.payment.failed');
     Route::post('/claims/{id}/rate', [UserController::class, 'rateClaim'])->name('user.claims.rate');
 });
 
