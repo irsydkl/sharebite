@@ -137,7 +137,7 @@
 
 {{-- Midtrans Snap.js --}}
 @if($snapToken)
-<script src="https://app.sandbox.midtrans.com/snap/snap.js"
+<script src="{{ $isProduction ? 'https://app.midtrans.com/snap/snap.js' : 'https://app.sandbox.midtrans.com/snap/snap.js' }}"
     data-client-key="{{ $clientKey }}"></script>
 <script>
     const payBtn     = document.getElementById('pay-button');
@@ -145,6 +145,7 @@
     const returnUrl  = payBtn.dataset.returnUrl;
     const countdown  = document.getElementById('countdown');
     const deadline   = new Date(countdown.dataset.deadline);
+    const midtransOrderId = @json($midtransOrderId ?? $claim->booking_code);
 
     // ── Countdown ──────────────────────────────────────────────────
     function updateCountdown() {
@@ -177,7 +178,7 @@
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
                 },
                 body: JSON.stringify({
-                    order_id: '{{ $claim->booking_code }}',
+                    order_id: midtransOrderId,
                     transaction_status: 'settlement',
                     status_code: '200',
                     gross_amount: '{{ $claim->total_price }}',

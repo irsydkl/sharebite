@@ -143,4 +143,46 @@ class ProfileTest extends TestCase
 
         $this->assertNotNull($user->fresh());
     }
+
+    public function test_user_can_upload_profile_photo(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+
+        $user = User::factory()->create();
+        $file = \Illuminate\Http\UploadedFile::fake()->image('avatar.jpg');
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'email' => $user->email,
+                'profile_photo' => $file,
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $user->refresh();
+
+        $this->assertNotNull($user->profile_photo);
+        \Illuminate\Support\Facades\Storage::disk('public')->assertExists($user->profile_photo);
+    }
+
+    public function test_user_can_delete_profile_photo(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+
+        $user = User::factory()->create([
+            'profile_photo' => 'avatars/dummy.jpg',
+        ]);
+        \Illuminate\Support\Facades\Storage::disk('public')->put('avatars/dummy.jpg', 'content');
+
+        $response = $this
+            ->actingAs($user)
+            ->delete('/profile/photo');
+
+        $response->assertRedirect('/profile');
+        $user->refresh();
+
+        $this->assertNull($user->profile_photo);
+        \Illuminate\Support\Facades\Storage::disk('public')->assertMissing('avatars/dummy.jpg');
+    }
 }

@@ -9,15 +9,15 @@ use App\Models\Notification;
 use App\Models\Payout;
 use App\Models\ProductCategory;
 use App\Models\User;
+use App\Services\PaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class DonaturController extends Controller
 {
-    /**
-     * Show the donatur dashboard with metrics.
-     */
+    public function __construct(private readonly PaymentService $paymentService) {}
+
     public function index()
     {
         $userId = Auth::id();
@@ -40,27 +40,37 @@ class DonaturController extends Controller
             })
             ->count();
 
-        // Total portion of food successfully distributed
+        $rejected = Food::where('donor_id', $userId)
+            ->where('approval_status', 'rejected')
+            ->count();
+
         $totalPorsi = FoodClaim::whereHas('food', fn ($q) => $q->where('donor_id', $userId))
             ->whereIn('claim_status', ['picked_up', 'completed'])
             ->sum('quantity_claimed');
 
-        // Food waste saved from landfill (portions distributed)
         $foodWaste = $totalPorsi;
+
+        // Fetch history of claimed portions for chart (last 30 days)
+        $portionsHistory = FoodClaim::whereHas('food', fn ($q) => $q->where('donor_id', $userId))
+            ->whereIn('claim_status', ['picked_up', 'completed'])
+            ->select(DB::raw('DATE(created_at) as date'), DB::raw('SUM(quantity_claimed) as total'))
+            ->groupBy('date')
+            ->orderBy('date', 'asc')
+            ->take(30)
+            ->get();
 
         return view('Pages.Donatur.dashboard', compact(
             'totalUnggahan',
             'approved',
             'pending',
+            'rejected',
             'nightApproved',
             'totalPorsi',
-            'foodWaste'
+            'foodWaste',
+            'portionsHistory'
         ));
     }
 
-    /**
-     * Show upload food form.
-     */
     public function create()
     {
         $categories = ProductCategory::all();
@@ -69,9 +79,6 @@ class DonaturController extends Controller
         return view('Pages.Donatur.upload', compact('categories', 'profile'));
     }
 
-    /**
-     * Store new food item.
-     */
     public function store(Request $request)
     {
         $request->validate([
@@ -93,17 +100,15 @@ class DonaturController extends Controller
         try {
             DB::transaction(function () use ($request) {
                 $originalPrice = (float) $request->input('original_price');
-                $serviceFee = round($originalPrice * 0.1, 2); // 10% service fee
+                $serviceFee = round($originalPrice * 0.1, 2);
                 $finalPrice = $originalPrice + $serviceFee;
 
                 $pickupStart = new \DateTime($request->input('pickup_start'));
                 $pickupEnd = new \DateTime($request->input('pickup_end'));
 
-                // Pickup deadline is 1 hour before pickup end, or at pickup end
                 $pickupDeadline = clone $pickupEnd;
                 $pickupDeadline->modify('-30 minutes');
 
-                // Create food
                 $food = Food::create([
                     'donor_id' => Auth::id(),
                     'category_id' => $request->input('category_id'),
@@ -122,11 +127,10 @@ class DonaturController extends Controller
                     'pickup_end' => $pickupEnd,
                     'pickup_deadline' => $pickupDeadline,
                     'pickup_duration_minutes' => 60,
-                    'approval_status' => 'pending', // Awaiting admin approval
+                    'approval_status' => 'pending',
                     'status' => 'available',
                 ]);
 
-                // Store images
                 if ($request->hasFile('images')) {
                     foreach ($request->file('images') as $file) {
                         $path = $file->store('foods', 'public');
@@ -137,7 +141,6 @@ class DonaturController extends Controller
                     }
                 }
 
-                // Notify admin about new food
                 $admins = User::where('role', 'admin')->get();
                 foreach ($admins as $admin) {
                     Notification::create([
@@ -157,9 +160,6 @@ class DonaturController extends Controller
         }
     }
 
-    /**
-     * Show claims on donatur's food items.
-     */
     public function claims()
     {
         $claims = FoodClaim::whereHas('food', fn ($q) => $q->where('donor_id', Auth::id()))
@@ -170,9 +170,6 @@ class DonaturController extends Controller
         return view('Pages.Donatur.riwayat', compact('claims'));
     }
 
-    /**
-     * Update food claim status (e.g. marking as picked up).
-     */
     public function updateClaimStatus(Request $request, $id)
     {
         $request->validate([
@@ -181,45 +178,59 @@ class DonaturController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use ($id, $request) {
+            $newStatus = $request->input('status');
+
+            if ($newStatus === 'picked_up') {
+                $claim = FoodClaim::where('id', $id)
+                    ->whereHas('food', fn ($q) => $q->where('donor_id', Auth::id()))
+                    ->firstOrFail();
+
+                if ($request->hasFile('pickup_proof')) {
+                    $path = $request->file('pickup_proof')->store('pickup_proofs', 'public');
+                    $claim->pickup_proof = $path;
+                    $claim->save();
+                }
+
+                $this->paymentService->completePickup($claim);
+                $claim->refresh();
+
+                Notification::create([
+                    'user_id' => $claim->user_id,
+                    'title' => 'Makanan Telah Diambil',
+                    'message' => "Makanan untuk booking {$claim->booking_code} telah dinyatakan selesai diambil. Silakan berikan ulasan Anda.",
+                    'type' => 'success',
+                ]);
+
+                return redirect()->route('donatur.claims')
+                    ->with('success', 'Pickup berhasil dikonfirmasi. Dana escrow masuk ke saldo pending donatur.');
+
+            }
+
+            DB::transaction(function () use ($id, $newStatus) {
                 $claim = FoodClaim::where('id', $id)
                     ->whereHas('food', fn ($q) => $q->where('donor_id', Auth::id()))
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                $newStatus = $request->input('status');
+                if ($newStatus === 'cancelled') {
+                    if ($claim->claim_status === 'waiting_payment') {
+                        $food = $claim->food()->lockForUpdate()->first();
+                        $food->remaining_quantity += $claim->quantity_claimed;
+                        if ($food->remaining_quantity > 0) {
+                            $food->status = 'available';
+                        }
+                        $food->save();
 
-                if ($newStatus === 'picked_up') {
-                    $claim->claim_status = 'picked_up';
-                    $claim->picked_up_at = now();
-
-                    if ($request->hasFile('pickup_proof')) {
-                        $path = $request->file('pickup_proof')->store('pickup_proofs', 'public');
-                        $claim->pickup_proof = $path;
+                        $payment = $claim->payment;
+                        if ($payment && $payment->payment_status === 'pending') {
+                            $payment->payment_status = 'failed';
+                            $payment->save();
+                        }
                     }
-                    $claim->save();
 
-                    // Notify recipient
-                    Notification::create([
-                        'user_id' => $claim->user_id,
-                        'title' => 'Makanan Telah Diambil',
-                        'message' => "Makanan untuk booking {$claim->booking_code} telah dinyatakan selesai diambil. Silakan berikan ulasan Anda.",
-                        'type' => 'success',
-                    ]);
-
-                } elseif ($newStatus === 'cancelled') {
                     $claim->claim_status = 'cancelled';
                     $claim->save();
 
-                    // Restore food stock
-                    $food = $claim->food;
-                    $food->remaining_quantity += $claim->quantity_claimed;
-                    if ($food->status === 'claimed') {
-                        $food->status = 'available';
-                    }
-                    $food->save();
-
-                    // Notify recipient
                     Notification::create([
                         'user_id' => $claim->user_id,
                         'title' => 'Klaim Dibatalkan',
@@ -240,9 +251,6 @@ class DonaturController extends Controller
         }
     }
 
-    /**
-     * Show payout transaction list.
-     */
     public function payouts()
     {
         $payouts = Payout::where('donor_id', Auth::id())

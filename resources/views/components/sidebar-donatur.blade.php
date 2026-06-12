@@ -80,7 +80,7 @@
         <div class="px-6 py-4 border-t border-gray-100 flex items-center gap-3">
             <div
                 class="w-10 h-10 rounded-full bg-blue-100 border border-blue-200 overflow-hidden flex items-center justify-center shrink-0">
-                <img src="{{ asset('images/avatar.png') }}" alt="Avatar" class="w-full h-full object-cover">
+                <img src="{{ Auth::user()->profile_photo ? asset('storage/' . Auth::user()->profile_photo) : asset('images/avatar.png') }}" alt="Avatar" class="w-full h-full object-cover">
             </div>
             <div class="overflow-hidden">
                 <p class="font-bold text-sm text-gray-900 truncate">{{ Auth::user()->name }}</p>

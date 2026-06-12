@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\BookingRequest;
 use App\Models\Food;
 use App\Models\FoodClaim;
+use App\Models\Notification;
 use App\Models\Rating;
 use App\Services\BookingService;
 use App\Services\PaymentService;
@@ -51,10 +52,10 @@ class UserController extends Controller
     {
         try {
             $result = $this->bookingService->book(
-                foodId:          (int) $id,
-                userId:          Auth::id(),
+                foodId: (int) $id,
+                userId: Auth::id(),
                 quantityClaimed: (int) $request->quantity_claimed,
-                paymentService:  $this->paymentService,
+                paymentService: $this->paymentService,
             );
 
             return redirect()
@@ -89,8 +90,10 @@ class UserController extends Controller
         }
 
         $clientKey = config('midtrans.client_key');
+        $isProduction = config('midtrans.is_production');
+        $midtransOrderId = $claim->payment?->transaction_reference;
 
-        return view('Pages.User.payment', compact('claim', 'snapToken', 'clientKey'));
+        return view('Pages.User.payment', compact('claim', 'snapToken', 'clientKey', 'isProduction', 'midtransOrderId'));
     }
 
     // ------------------------------------------------------------------ //
@@ -103,9 +106,9 @@ class UserController extends Controller
         return match ($claim->claim_status) {
             'ready_pickup' => redirect()->route('riwayat.index')
                 ->with('success', 'Pembayaran berhasil dikonfirmasi. Silakan ambil makanan Anda.'),
-            'cancelled'    => redirect()->route('user.dashboard')
+            'cancelled' => redirect()->route('user.dashboard')
                 ->with('error', 'Pembayaran dibatalkan. Klaim telah dibatalkan dan stok dikembalikan.'),
-            default        => redirect()->route('user.claims.payment', $id)
+            default => redirect()->route('user.claims.payment', $id)
                 ->with('info', 'Pembayaran sedang diproses. Silakan tunggu konfirmasi.'),
         };
     }
@@ -135,11 +138,11 @@ class UserController extends Controller
                 }
 
                 Rating::create([
-                    'food_id'  => $claim->food_id,
+                    'food_id' => $claim->food_id,
                     'claim_id' => $claim->id,
-                    'user_id'  => Auth::id(),
-                    'rating'   => $request->input('rating'),
-                    'review'   => $request->input('review'),
+                    'user_id' => Auth::id(),
+                    'rating' => $request->input('rating'),
+                    'review' => $request->input('review'),
                 ]);
 
                 if ($claim->claim_status === 'picked_up') {
@@ -147,11 +150,11 @@ class UserController extends Controller
                     $claim->save();
                 }
 
-                \App\Models\Notification::create([
+                Notification::create([
                     'user_id' => $claim->food->donor_id,
-                    'title'   => 'Ulasan Baru Diterima',
+                    'title' => 'Ulasan Baru Diterima',
                     'message' => 'Pengguna memberikan ulasan bintang '.$request->input('rating')." untuk makanan '{$claim->food->title}'.",
-                    'type'    => 'success',
+                    'type' => 'success',
                 ]);
             });
 

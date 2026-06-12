@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Food;
 use Illuminate\Support\Facades\Auth;
 
 class HomeController extends Controller
@@ -15,6 +16,12 @@ class HomeController extends Controller
             return redirect()->route(Auth::user()->dashboardRouteName());
         }
 
-        return view('Pages.User.home');
+        $foods = Food::where('status', 'available')
+            ->where('approval_status', 'approved')
+            ->with(['category', 'images', 'donor.donorProfile'])
+            ->latest()
+            ->get();
+
+        return view('Pages.User.home', compact('foods'));
     }
 }

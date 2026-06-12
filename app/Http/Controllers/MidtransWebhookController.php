@@ -21,38 +21,40 @@ class MidtransWebhookController extends Controller
     {
         try {
             // Configure Midtrans for verification
-            MidtransConfig::$serverKey    = config('midtrans.server_key');
+            MidtransConfig::$serverKey = config('midtrans.server_key');
             MidtransConfig::$isProduction = config('midtrans.is_production');
 
-            $isMockSimulation = config('app.env') === 'local' && $request->input('is_mock_simulation') === true;
+            $isMockSimulation = app()->environment(['local', 'testing'])
+                && $request->boolean('is_mock_simulation');
 
             if ($isMockSimulation) {
-                $orderId           = $request->input('order_id');
+                $orderId = $request->input('order_id');
                 $transactionStatus = $request->input('transaction_status');
-                $fraudStatus       = $request->input('fraud_status', 'accept');
-                $transactionId     = $request->input('transaction_id');
-                $paymentType       = $request->input('payment_type');
+                $fraudStatus = $request->input('fraud_status', 'accept');
+                $transactionId = $request->input('transaction_id');
+                $paymentType = $request->input('payment_type');
             } else {
                 // Parse & verify the notification
-                $notification = new Notification();
+                $notification = new Notification;
 
-                $orderId           = $notification->order_id;
+                $orderId = $notification->order_id;
                 $transactionStatus = $notification->transaction_status;
-                $fraudStatus       = $notification->fraud_status ?? 'accept';
-                $signatureKey      = $notification->signature_key ?? '';
-                $transactionId     = $notification->transaction_id ?? null;
-                $paymentType       = $notification->payment_type ?? null;
+                $fraudStatus = $notification->fraud_status ?? 'accept';
+                $signatureKey = $notification->signature_key ?? '';
+                $transactionId = $notification->transaction_id ?? null;
+                $paymentType = $notification->payment_type ?? null;
 
                 // Verify signature
                 $expectedSignature = hash('sha512',
                     $orderId
-                    . $notification->status_code
-                    . $notification->gross_amount
-                    . config('midtrans.server_key')
+                    .$notification->status_code
+                    .$notification->gross_amount
+                    .config('midtrans.server_key')
                 );
 
                 if ($signatureKey && $signatureKey !== $expectedSignature) {
                     Log::warning("Midtrans webhook: invalid signature for order_id={$orderId}");
+
                     return response()->json(['message' => 'Invalid signature'], 403);
                 }
             }
@@ -61,10 +63,10 @@ class MidtransWebhookController extends Controller
 
             // Build payload for service
             $payload = [
-                'order_id'           => $orderId,
+                'order_id' => $orderId,
                 'transaction_status' => $this->resolveStatus($transactionStatus, $fraudStatus),
-                'transaction_id'     => $transactionId,
-                'payment_type'       => $paymentType,
+                'transaction_id' => $transactionId,
+                'payment_type' => $paymentType,
             ];
 
             $this->paymentService->handleWebhook($payload);

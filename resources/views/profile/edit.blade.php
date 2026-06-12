@@ -32,6 +32,15 @@
                 </button>
             </div>
         @endif
+        @if(session('status') === 'profile-photo-deleted')
+            <div id="flash-photo-deleted" class="mb-6 flex items-center gap-3 bg-green-50 border border-green-200 text-green-800 px-5 py-4 rounded-xl">
+                <i class="fa-solid fa-circle-check text-green-600"></i>
+                <span class="font-medium text-sm">Foto profil berhasil dihapus.</span>
+                <button onclick="document.getElementById('flash-photo-deleted').remove()" class="ml-auto text-green-500 hover:text-green-700">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        @endif
         @if(session('status') === 'store-updated')
             <div id="flash-store" class="mb-6 flex items-center gap-3 bg-green-50 border border-green-200 text-green-800 px-5 py-4 rounded-xl">
                 <i class="fa-solid fa-circle-check text-green-600"></i>
@@ -76,33 +85,62 @@
             </div>
 
             <div class="px-6 py-6">
-                {{-- Avatar + Role Badge --}}
-                <div class="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100">
-                    <div class="w-16 h-16 rounded-full bg-emerald-100 border-2 border-emerald-200 flex items-center justify-center shrink-0">
-                        <span class="text-2xl font-bold text-emerald-700">
-                            {{ strtoupper(substr($user->name, 0, 1)) }}
-                        </span>
-                    </div>
-                    <div>
-                        <p class="font-bold text-gray-900">{{ $user->name }}</p>
-                        <p class="text-sm text-gray-500">{{ $user->email }}</p>
-                        <span class="inline-flex items-center mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider
-                            @if($user->isAdmin()) bg-violet-100 text-violet-700 border border-violet-200
-                            @elseif($user->isDonatur()) bg-emerald-100 text-emerald-700 border border-emerald-200
-                            @else bg-blue-100 text-blue-700 border border-blue-200 @endif">
-                            @if($user->isAdmin()) Admin
-                            @elseif($user->isDonatur()) Donatur
-                            @else Penerima @endif
-                        </span>
-                    </div>
-                </div>
-
                 {{-- Hidden verification form --}}
                 <form id="send-verification" method="post" action="{{ route('verification.send') }}">@csrf</form>
+                {{-- Hidden delete photo form --}}
+                <form id="delete-photo-form" method="post" action="{{ route('profile.photo.destroy') }}">@csrf @method('delete')</form>
 
-                <form method="post" action="{{ route('profile.update') }}" class="space-y-5">
+                <form method="post" action="{{ route('profile.update') }}" enctype="multipart/form-data" class="space-y-5">
                     @csrf
                     @method('patch')
+
+                    {{-- Avatar + Role Badge & Upload UI --}}
+                    <div class="flex flex-col sm:flex-row items-center gap-5 mb-6 pb-6 border-b border-gray-100">
+                        <div class="relative shrink-0">
+                            @if($user->profile_photo)
+                                <img id="avatar-preview" src="{{ asset('storage/' . $user->profile_photo) }}" alt="{{ $user->name }}" class="w-16 h-16 rounded-full object-cover border-2 border-emerald-200 shadow-sm">
+                            @else
+                                <div id="avatar-placeholder" class="w-16 h-16 rounded-full bg-emerald-100 border-2 border-emerald-200 flex items-center justify-center shrink-0 shadow-sm font-bold text-emerald-700 text-2xl">
+                                    {{ strtoupper(substr($user->name, 0, 1)) }}
+                                </div>
+                                <img id="avatar-preview" class="hidden w-16 h-16 rounded-full object-cover border-2 border-emerald-200 shadow-sm">
+                            @endif
+                        </div>
+                        <div class="flex-1 text-center sm:text-left">
+                            <h3 class="text-sm font-semibold text-gray-900 mb-1">Foto Profil</h3>
+                            <p class="text-xs text-gray-500 mb-3">Format JPG, JPEG, PNG, atau WEBP (Maks. 2MB).</p>
+                            
+                            <div class="flex flex-wrap justify-center sm:justify-start gap-2">
+                                <label for="profile_photo" class="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-lg shadow-sm transition">
+                                    <i class="fa-solid fa-cloud-arrow-up text-emerald-600"></i>
+                                    Pilih Foto
+                                </label>
+                                <input id="profile_photo" name="profile_photo" type="file" accept="image/*" class="hidden" onchange="previewImage(this)">
+                                
+                                @if($user->profile_photo)
+                                    <button type="button" onclick="document.getElementById('delete-photo-form').submit();" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 hover:bg-red-100 text-red-700 text-xs font-semibold rounded-lg transition">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                        Hapus Foto
+                                    </button>
+                                @endif
+                            </div>
+                            @error('profile_photo')
+                                <p class="mt-1.5 text-xs text-red-600 flex items-center gap-1 justify-center sm:justify-start">
+                                    <i class="fa-solid fa-circle-exclamation"></i> {{ $message }}
+                                </p>
+                            @enderror
+                        </div>
+                        <div class="sm:ml-auto">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider
+                                @if($user->isAdmin()) bg-violet-100 text-violet-700 border border-violet-200
+                                @elseif($user->isDonatur()) bg-emerald-100 text-emerald-700 border border-emerald-200
+                                @else bg-blue-100 text-blue-700 border border-blue-200 @endif">
+                                @if($user->isAdmin()) Admin
+                                @elseif($user->isDonatur()) Donatur
+                                @else Penerima @endif
+                            </span>
+                        </div>
+                    </div>
 
                     {{-- Name + Email (2 columns) --}}
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -542,5 +580,26 @@
     });
 </script>
 @endif
+
+<script>
+    function previewImage(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById('avatar-preview');
+                const placeholder = document.getElementById('avatar-placeholder');
+                
+                if (preview) {
+                    preview.src = e.target.result;
+                    preview.classList.remove('hidden');
+                }
+                if (placeholder) {
+                    placeholder.classList.add('hidden');
+                }
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+</script>
 
 @endsection

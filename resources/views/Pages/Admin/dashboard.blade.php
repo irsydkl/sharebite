@@ -202,6 +202,236 @@
                 </div>
             </div>
         </section>
+
+        <!-- Charts Section -->
+        <section class="mt-8 mb-12">
+            <h2 class="text-xl font-bold text-gray-900 mb-6">Analisis Platform</h2>
+            <div class="grid grid-cols-1 gap-6 mb-6">
+                <!-- Transaction History Chart -->
+                <div class="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-base font-semibold text-gray-900">Tren Transaksi Harian (30 Hari Terakhir)</h3>
+                        <span class="text-xs text-indigo-600 font-medium bg-indigo-50 px-2.5 py-1 rounded-full">
+                            <i class="fa-solid fa-chart-line mr-1"></i> Total Pembayaran
+                        </span>
+                    </div>
+                    <div class="h-80 w-full relative">
+                        <canvas id="paymentsHistoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Food Category Distribution -->
+                <div class="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+                    <h3 class="text-base font-semibold text-gray-900 mb-4">Distribusi Makanan per Kategori</h3>
+                    <div class="h-80 w-full relative">
+                        <canvas id="foodCategoriesChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- User Roles Proportion -->
+                <div class="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900 mb-4">Proporsi Peran Pengguna</h3>
+                    </div>
+                    <div class="h-64 w-full relative flex items-center justify-center mb-4">
+                        <canvas id="userRolesChart"></canvas>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 text-center text-xs font-semibold mt-2 border-t border-gray-100 pt-4">
+                        @php
+                            $adminCount = $userRoles->firstWhere('role', 'admin')->total ?? 0;
+                            $donaturCount = $userRoles->firstWhere('role', 'donatur')->total ?? 0;
+                            $recipientCount = $userRoles->firstWhere('role', 'user')->total ?? 0;
+                        @endphp
+                        <div>
+                            <span class="block text-violet-700 text-lg font-bold">{{ $adminCount }}</span>
+                            <span class="text-gray-500 text-[10px]">Admin</span>
+                        </div>
+                        <div>
+                            <span class="block text-emerald-600 text-lg font-bold">{{ $donaturCount }}</span>
+                            <span class="text-gray-500 text-[10px]">Donatur</span>
+                        </div>
+                        <div>
+                            <span class="block text-blue-600 text-lg font-bold">{{ $recipientCount }}</span>
+                            <span class="text-gray-500 text-[10px]">Penerima</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
     </div>
 </main>
+
+{{-- ChartJS Integration --}}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // 1. Transaction History Chart
+        const paymentsData = @json($paymentsHistory);
+        const dates = paymentsData.map(item => {
+            const d = new Date(item.date);
+            return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+        });
+        const amounts = paymentsData.map(item => item.total);
+
+        const labelDates = dates.length > 0 ? dates : ['Tidak ada data'];
+        const labelAmounts = amounts.length > 0 ? amounts : [0];
+
+        const ctxPayments = document.getElementById('paymentsHistoryChart').getContext('2d');
+        const gradient = ctxPayments.createLinearGradient(0, 0, 0, 300);
+        gradient.addColorStop(0, 'rgba(79, 70, 229, 0.25)');
+        gradient.addColorStop(1, 'rgba(79, 70, 229, 0.00)');
+
+        new Chart(ctxPayments, {
+            type: 'line',
+            data: {
+                labels: labelDates,
+                datasets: [{
+                    label: 'Total Pendapatan',
+                    data: labelAmounts,
+                    borderColor: '#4f46e5',
+                    borderWidth: 3,
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.35,
+                    pointBackgroundColor: '#4f46e5',
+                    pointHoverRadius: 6,
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: '#4f46e5',
+                    pointHoverBorderWidth: 3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: '#1e293b',
+                        titleFont: { size: 12, weight: 'bold' },
+                        bodyFont: { size: 12 },
+                        padding: 12,
+                        cornerRadius: 8,
+                        displayColors: false,
+                        callbacks: {
+                            label: function(context) {
+                                return ` Rp ${new Intl.NumberFormat('id-ID').format(context.raw)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            font: { size: 11 }
+                        }
+                    },
+                    y: {
+                        grid: {
+                            color: 'rgba(241, 245, 249, 1)',
+                            drawTicks: false
+                        },
+                        ticks: {
+                            font: { size: 11 },
+                            callback: function(value) {
+                                return 'Rp ' + new Intl.NumberFormat('id-ID', { notation: 'compact' }).format(value);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // 2. Food Category Chart
+        const categoriesData = @json($foodCategories);
+        const categoryLabels = categoriesData.map(item => item.name);
+        const categoryTotals = categoriesData.map(item => item.total);
+
+        const ctxCategories = document.getElementById('foodCategoriesChart').getContext('2d');
+        new Chart(ctxCategories, {
+            type: 'bar',
+            data: {
+                labels: categoryLabels.length > 0 ? categoryLabels : ['Tidak ada data'],
+                datasets: [{
+                    label: 'Jumlah Makanan',
+                    data: categoryTotals.length > 0 ? categoryTotals : [0],
+                    backgroundColor: 'rgba(16, 185, 129, 0.85)',
+                    borderRadius: 8,
+                    maxBarThickness: 35
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: '#1e293b',
+                        padding: 10,
+                        cornerRadius: 8,
+                        displayColors: false
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11 } }
+                    },
+                    y: {
+                        grid: { color: 'rgba(241, 245, 249, 1)', drawTicks: false },
+                        ticks: { precision: 0, font: { size: 11 } }
+                    }
+                }
+            }
+        });
+
+        // 3. User Roles Proportion Chart
+        const ctxRoles = document.getElementById('userRolesChart').getContext('2d');
+        new Chart(ctxRoles, {
+            type: 'pie',
+            data: {
+                labels: ['Admin', 'Donatur', 'Penerima'],
+                datasets: [{
+                    data: [{{ $adminCount }}, {{ $donaturCount }}, {{ $recipientCount }}],
+                    backgroundColor: ['#7c3aed', '#10b981', '#2563eb'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 11 },
+                            padding: 15
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#1e293b',
+                        padding: 10,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: function(context) {
+                                return ` ${context.label}: ${context.raw} Pengguna`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
 @endsection

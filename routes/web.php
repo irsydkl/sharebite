@@ -12,15 +12,13 @@ use Illuminate\Support\Facades\Route;
 
 // ── Midtrans Webhook (no auth, no CSRF) ───────────────────────────────────
 Route::post('/webhook/midtrans', [MidtransWebhookController::class, 'handle'])
-    ->name('webhook.midtrans')
-    ->withoutMiddleware(['web']);
+    ->name('webhook.midtrans');
 
 // Guest or Authenticated Redirect Home
 Route::get('/', [HomeController::class, 'index'])->name('home');
 
 // General Authenticated Routes
 Route::middleware(['auth', 'verified'])->group(function () {
-    // Shared Dashboard Redirect (if needed, but each role has their own)
     Route::get('/dashboard', function () {
         return redirect()->route(auth()->user()->dashboardRouteName());
     })->name('dashboard');
@@ -28,6 +26,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Profile Settings
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile/photo', [ProfileController::class, 'destroyPhoto'])->name('profile.photo.destroy');
     Route::patch('/profile/store', [ProfileController::class, 'updateStore'])
         ->middleware('role:donatur')
         ->name('profile.store.update');

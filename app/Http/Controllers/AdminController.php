@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 class AdminController extends Controller
 {
     public function __construct(private readonly PaymentService $paymentService) {}
+
     /**
      * Display admin dashboard.
      */
@@ -31,6 +32,25 @@ class AdminController extends Controller
         $totalPayouts = Payout::sum('amount');
         $totalPayments = Payment::where('payment_status', 'paid')->sum('amount');
 
+        // Fetch daily transaction history for paid payments (last 30 days)
+        $paymentsHistory = Payment::where('payment_status', 'paid')
+            ->select(DB::raw('DATE(created_at) as date'), DB::raw('SUM(amount) as total'))
+            ->groupBy('date')
+            ->orderBy('date', 'asc')
+            ->take(30)
+            ->get();
+
+        // Fetch food category distribution
+        $foodCategories = Food::select('product_categories.name', DB::raw('count(*) as total'))
+            ->join('product_categories', 'foods.category_id', '=', 'product_categories.id')
+            ->groupBy('product_categories.name')
+            ->get();
+
+        // Fetch user roles distribution
+        $userRoles = User::select('role', DB::raw('count(*) as total'))
+            ->groupBy('role')
+            ->get();
+
         return view('Pages.Admin.dashboard', compact(
             'totalUsers',
             'totalDonaturs',
@@ -38,7 +58,10 @@ class AdminController extends Controller
             'pendingDonatursCount',
             'pendingFoodsCount',
             'totalPayouts',
-            'totalPayments'
+            'totalPayments',
+            'paymentsHistory',
+            'foodCategories',
+            'userRoles'
         ));
     }
 
@@ -192,16 +215,17 @@ class AdminController extends Controller
      */
     public function payouts()
     {
-        $payments = Payment::where('payment_status', 'paid')
-            ->with(['claim.food.donor.donorProfile', 'payout'])
+        $pendingPayouts = Payout::where('status', 'pending')
+            ->with(['payment.claim.food', 'donor.donorProfile'])
             ->latest()
             ->get();
 
-        $payouts = Payout::with(['payment.claim.food', 'donor.donorProfile'])
+        $completedPayouts = Payout::where('status', 'completed')
+            ->with(['payment.claim.food', 'donor.donorProfile'])
             ->latest()
             ->get();
 
-        return view('Pages.Admin.payouts', compact('payments', 'payouts'));
+        return view('Pages.Admin.payouts', compact('pendingPayouts', 'completedPayouts'));
     }
 
     /**
